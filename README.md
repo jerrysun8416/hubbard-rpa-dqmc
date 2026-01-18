@@ -1,6 +1,6 @@
 # Hubbard Model: RPA Analysis and DQMC Validation
 
-## Notice: 
+## `v0.0.1` Notice: 
 - `src` is ready to run: DQMC on 2D Bipartite Hubbard model.
 - `notebooks` are not organized: RPA comparison and post analyzing.
 
