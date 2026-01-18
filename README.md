@@ -1,5 +1,9 @@
 # Hubbard Model: RPA Analysis and DQMC Validation
 
+## Notice: 
+- `src` is ready to run: DQMC on 2D Bipartite Hubbard model.
+- `notebooks` are not organized: RPA comparison and post analyzing.
+
 A comprehensive computational study of the two-dimensional Hubbard model combining analytical Random Phase Approximation (RPA) with exact Determinantal Quantum Monte Carlo (DQMC) simulations.
 
 ---
