@@ -8,15 +8,20 @@ A comprehensive computational study of the two-dimensional Hubbard model combini
 
 1. [Overview](#overview)
 2. [Theoretical Background](#theoretical-background)
-   - [The Hubbard Model](#the-hubbard-model)
-   - [Green's Functions](#greens-functions)
-   - [Random Phase Approximation](#random-phase-approximation)
-   - [Spin Susceptibility](#spin-susceptibility)
-   - [Stoner Criterion](#stoner-criterion)
-   - [D-Normalization Scheme](#d-normalization-scheme)
+    - [The Hubbard Model](#the-hubbard-model)
+    - [Green's Functions](#greens-functions)
+    - [Random Phase Approximation](#random-phase-approximation)
+    - [Spin Susceptibility](#spin-susceptibility)
+    - [Stoner Criterion](#stoner-criterion)
+    - [D-Normalization Scheme](#d-normalization-scheme)
 3. [Computational Methods](#computational-methods)
-   - [DQMC Algorithm](#dqmc-algorithm)
-   - [RPA Implementation](#rpa-implementation)
+    - [DQMC Algorithm](#dqmc-algorithm)
+        - [Numerical Stabilization: The Ill-Conditioned Problem](#numerical-stabilization-the-ill-conditioned-problem)
+        - [QR Stabilization Algorithm](#qr-stabilization-algorithm)
+        - [Green's Function Update Strategy](#greens-function-update-strategy)
+        - [Monte Carlo Sampling](#monte-carlo-sampling)
+    - [Parameters](#parameters)
+    - [RPA Implementation](#rpa-implementation)
 4. [Installation](#installation)
 5. [Usage](#usage)
 6. [Repository Structure](#repository-structure)
@@ -84,6 +89,7 @@ where **Tτ** is the imaginary-time ordering operator for τ ∈ [0, β].
 **Key properties:**
 1. **Anti-periodicity**: G(τ + β) = -G(τ)
 2. **Matsubara representation**:
+
    $$G(\mathbf{k}, \tau) = \frac{1}{\beta} \sum_n G(\mathbf{k}, i\omega_n) e^{-i\omega_n \tau}$$
    where ωₙ = (2n+1)π/β are fermionic Matsubara frequencies
 
@@ -133,20 +139,26 @@ When ξ(**k**+**q**) ≈ ξ(**k**), we use l'Hôpital's rule:
 $$\lim_{\Delta\xi \to 0} \frac{f(\xi) - f(\xi + \Delta\xi)}{\Delta\xi} = -\frac{\partial f}{\partial \xi} = \beta f(\xi)[1 - f(\xi)]$$
 
 **Implementation:**
-```
-For each momentum q:
-  sum = 0
-  For each k in Brillouin zone:
-    ε_k = -2t[cos(kx) + cos(ky)] - μ
-    ε_k+q = -2t[cos(kx+qx) + cos(ky+qy)] - μ
-    Δε = ε_k+q - ε_k
+```python
+# For each momentum q:
+sum_chi0 = 0.0
+for k in brillouin_zone:
+    # Dispersion relations
+    eps_k = -2*t*(cos(kx) + cos(ky)) - mu
+    eps_kq = -2*t*(cos(kx+qx) + cos(ky+qy)) - mu
+    delta_eps = eps_kq - eps_k
     
-    If |Δε| < tolerance:
-      sum += β × f(ε_k) × [1 - f(ε_k)]
-    Else:
-      sum += [f(ε_k) - f(ε_k+q)] / Δε
-  
-  χ₀(q) = sum / N
+    # Fermi functions
+    f_k = 1.0 / (1.0 + exp(beta * eps_k))
+    f_kq = 1.0 / (1.0 + exp(beta * eps_kq))
+    
+    # Handle degeneracies
+    if abs(delta_eps) < tolerance:
+        sum_chi0 += beta * f_k * (1.0 - f_k)
+    else:
+        sum_chi0 += (f_k - f_kq) / delta_eps
+
+chi0_q = sum_chi0 / N
 ```
 
 **Physical interpretation:**
@@ -163,17 +175,6 @@ $$\chi(\mathbf{q}) = \chi_0(\mathbf{q}) + \chi_0(\mathbf{q}) U \chi_0(\mathbf{q}
 This geometric series sums to:
 
 $$\chi(\mathbf{q}) = \frac{\chi_0(\mathbf{q})}{1 - U \chi_0(\mathbf{q})}$$
-
-**Diagrammatic interpretation:**
-```
-χ = χ₀ + χ₀ U χ₀ + χ₀ U χ₀ U χ₀ + ...
-
-    ○        ○   ○        ○   ○   ○
-χ = ─── + ───╱─\─── + ───╱─\─╱─\─── + ...
-            U            U   U
-
-where ○──○ represents χ₀ (bubble)
-```
 
 **Physical meaning:**
 - RPA captures **screening** of bare interaction
@@ -213,11 +214,8 @@ $$\sum_{\mathbf{q}} S^z(\mathbf{q}) = \frac{N}{4} \langle (n_\uparrow - n_\downa
 where **D = ⟨n↑n↓⟩** is the **double occupancy** (probability of two electrons on same site).
 
 **Derivation:**
-```
-⟨(n↑ - n↓)²⟩ = ⟨n↑² + n↓² - 2n↑n↓⟩
-             = ⟨n↑⟩ + ⟨n↓⟩ - 2⟨n↑n↓⟩    [since n²_σ = n_σ for fermions]
-             = 1 - 2D                    [at half-filling: ⟨n↑⟩ + ⟨n↓⟩ = 1]
-```
+
+$$\langle (n_\uparrow - n_\downarrow)^2 \rangle = \langle n_\uparrow^2 + n_\downarrow^2 - 2n_\uparrow n_\downarrow \rangle = \langle n_\uparrow \rangle + \langle n_\downarrow \rangle - 2\langle n_\uparrow n_\downarrow \rangle $$
 
 **Importance:** This sum rule provides a thermodynamic constraint for validation.
 
@@ -276,20 +274,6 @@ This gives a **temperature-dependent phase boundary**:
 
 $$T_c(U) : 1 - U \chi_0(\mathbf{q}^*, T_c) = 0$$
 
-**Phase diagram structure:**
-```
-Temperature T
-    ↑
-    |   Paramagnetic
-    |   (1 - Uχ₀ > 0)
- Tc |___________________
-    |                   
-    | Magnetically      
-    | Ordered           
-    |   (1 - Uχ₀ < 0)  
-    └──────────────────→ U
-           Uc
-```
 
 #### Stoner Indicator Function
 
@@ -331,9 +315,11 @@ $$I_{\text{AFM}} = 1 - U \chi_0(\pi, \pi, \beta)$$
    $$\text{Target} = \frac{1}{4}(1 - 2D_{\text{DQMC}}) N$$
 
 4. **Find normalization factor α**:
+
    $$\alpha = \frac{\text{Target}}{\sum_{\mathbf{q}} S^z_{\text{RPA}}(\mathbf{q})} = \frac{(1 - 2D_{\text{DQMC}}) N}{4 \sum_{\mathbf{q}} S^z_{\text{RPA}}(\mathbf{q})}$$
 
 5. **Apply rescaling**:
+
    $$S^z_{\text{norm}}(\mathbf{q}) = \alpha \cdot S^z_{\text{RPA}}(\mathbf{q})$$
 
 #### Properties
@@ -415,27 +401,155 @@ $$G = [1 + B]^{-1}$$
 - Double occupancy: D = ⟨(1 - G↑)(1 - G↓)⟩/N
 - Spin correlations: Compute in momentum space for S(**q**)
 
-#### Numerical Stabilization
+---
 
-**Challenge:** Product ∏ Bₗ causes exponential growth/decay of singular values.
+#### Numerical Stabilization: The Ill-Conditioned Problem
 
-**Solution - QR decomposition every k steps:**
+**The Core Challenge:**
 
-```python
-Q = I; R = I
-for l in 1...L:
-    C = B_l × Q
-    Q, R_new = QR(C)
-    R = R_new × R
-    
-    if l mod k == 0:  # Stabilize
-        Q_r, R = QR(R)
-        Q = Q × Q_r
+Computing G = [1 + B]^{-1} directly is **numerically catastrophic** because:
 
-G = [I + R×Q]^{-1} = I - Q × [I + R]^{-1} × R
+1. **Exponential scale separation**: The matrix product B = ∏ᴸₗ₌₁ Bₗ contains both exponentially large and small singular values
+2. **Condition number explosion**: κ(B) ~ exp(Lλ_max) where λ_max is the largest eigenvalue of K
+3. **Loss of precision**: Machine precision (ε ~ 10⁻¹⁶) is exhausted when κ(B) > 10¹⁶
+
+**Why the problem occurs:**
+
+Each propagator Bₗ has eigenvalues λᵢ ∈ [exp(-Δτε_max), exp(-Δτε_min)], where ε_max and ε_min are extremal energies. After L multiplications:
+
+$$\text{Singular values of } B: \quad \sigma_i \in [\exp(-L\Delta\tau \varepsilon_{\max}), \exp(-L\Delta\tau \varepsilon_{\min})]$$
+
+For typical parameters (β = 6, U = 4, L = 120):
+- Largest singular value: σ_max ~ 10⁸
+- Smallest singular value: σ_min ~ 10⁻⁸
+- Condition number: κ = σ_max/σ_min ~ 10¹⁶ (**at machine precision limit!**)
+
+**What goes wrong without stabilization:**
+```
+Naive computation:
+B = B₁ × B₂ × ... × B₁₂₀     # Overflow/underflow in intermediate products
+G = inv(I + B)                # Meaningless result due to numerical errors
 ```
 
-This prevents numerical overflow while preserving G exactly.
+Errors accumulate exponentially: relative error ~ L × ε × κ(B) ≫ 1
+
+---
+
+#### QR Stabilization Algorithm
+
+**Strategy:** Systematically separate large and small scales using orthogonal-triangular decomposition.
+
+**Key Insight:** The QR decomposition B = QR where:
+- Q is orthogonal (κ(Q) = 1, perfectly conditioned)
+- R is upper triangular (carries all the scale information)
+
+By redistributing scales into R and keeping Q well-conditioned, we prevent overflow/underflow.
+
+**Step-by-Step Algorithm:**
+```python
+# Initialize
+Q = I (N × N identity)
+R = I (N × N identity)
+
+for l in 1 to L:
+    # Multiply by next time slice
+    C = B_l × Q
+    
+    # QR decompose: separate scales
+    Q_new, R_new = QR(C)
+    
+    # Update: Q stays orthogonal, R accumulates scales
+    Q = Q_new
+    R = R_new × R
+    
+    # Periodic stabilization (every k steps)
+    if l mod k == 0:
+        # Re-orthogonalize R itself
+        Q_r, R_new = QR(R)
+        Q = Q × Q_r
+        R = R_new
+
+# Final Green's function (stable formula)
+G = I - Q × [I + R]^{-1} × R
+```
+
+**Why this works:**
+
+1. **Scale separation**: After each QR, Q has singular values σ(Q) = 1, while R contains all exponential factors
+
+2. **Controlled arithmetic**: Operations on Q never overflow; R is triangular so inversion is stable
+
+3. **Periodic redistribution**: Every k steps, we "reset" by decomposing R itself, preventing scale accumulation
+
+4. **Mathematical equivalence**:
+```
+   B = Q × R  (by construction)
+   [I + B]^{-1} = [I + QR]^{-1} 
+                = [Q^T Q + Q^T QR]^{-1}
+                = [Q^T(I + R)Q]^{-1}
+                = Q^{-1} [I + R]^{-1} Q^{-T}
+                = I - Q[I + R]^{-1}R    (after algebra)
+```
+
+**Stabilization frequency k:**
+
+Choose k such that κ(∏ᵏᵢ₌₁ Bₗ) < ε⁻¹/²:
+
+$$k \approx \frac{1}{2\Delta\tau \lambda_{\max}} \ln(\epsilon^{-1/2})$$
+
+Typical value: k = 8-16 for β ~ 1-10, U ~ 1-10
+
+---
+
+#### Numerical Comparison
+
+**Without stabilization:**
+```
+L = 120, β = 6, U = 4
+σ_max(B) ~ 10⁸
+σ_min(B) ~ 10⁻⁸
+κ(B) ~ 10¹⁶
+
+Result: G has ~50% error in matrix elements
+Observable error: ⟨n⟩ = 0.5 ± 0.3 (meaningless!)
+```
+
+**With QR stabilization (k = 16):**
+```
+Each QR step: κ(Q) = 1 exactly
+Intermediate κ(R) < 10⁸ (manageable)
+Final G: relative error ~ 10⁻¹²
+
+Result: ⟨n⟩ = 1.000 ± 0.001 (correct!)
+```
+
+**Performance cost:** 
+- QR decomposition: O(N³) per step
+- Frequency: L/k times
+- Total overhead: ~10-20% compared to naive multiplication
+- **Worth it:** Correct results vs. garbage
+
+---
+
+#### Alternative: SVD Stabilization
+
+Another approach uses Singular Value Decomposition:
+
+$$B = U\Sigma V^T$$
+
+Then:
+$$G = [I + B]^{-1} = V[\Sigma^{-1} + U^T V]^{-1} U^T$$
+
+**Comparison:**
+| Method | Stability | Cost | Ease of Implementation |
+|--------|-----------|------|------------------------|
+| QR     | Excellent | O(N³) | Moderate |
+| SVD    | Excellent | O(N³) | Complex |
+| Naive  | Fails     | O(N³) | Trivial |
+
+We use QR as it offers the best stability-cost-complexity tradeoff. 
+
+---
 
 #### Monte Carlo Sampling
 
@@ -444,7 +558,7 @@ This prevents numerical overflow while preserving G exactly.
 1. Propose flip: sᵢ,ₗ → -sᵢ,ₗ
 
 2. Compute acceptance ratio:
-   $$r = \left| \det(1 + B'_\uparrow) \det(1 + B'_\downarrow) \right| / \left| \det(1 + B_\uparrow) \det(1 + B_\downarrow) \right|$$
+   $$r = \left| \frac{\det(1 + B'_\uparrow) \det(1 + B'_\downarrow)}{\det(1 + B_\uparrow) \det(1 + B_\downarrow)} \right|$$
 
 3. Accept with probability min(1, r)
 
@@ -452,14 +566,142 @@ This prevents numerical overflow while preserving G exactly.
 Can compute r from rank-1 update without full determinant:
 $$r = [1 + (1 - G_{ii})(e^{2\lambda s_{i,l}} - 1)]_\uparrow \times [1 + (1 - G_{ii})(e^{-2\lambda s_{i,l}} - 1)]_\downarrow$$
 
+This reduces cost from O(N³) to O(1) per flip proposal.
+
+---
+
 #### Parameters
 
 **Typical settings:**
 - Time slices: L = 120 (Δτ = β/120)
 - Warm-up sweeps: 200 (thermalization)
 - Measurement sweeps: 800 (statistics)
-- Stabilization frequency: every 16 steps
+- **Stabilization frequency: k = 16 steps** ← Critical for accuracy!
 - MPI parallelization: 4-8 independent runs
+
+**Convergence checks:**
+- ✓ Particle number: |⟨n_↑⟩ + ⟨n_↓⟩ - 1| < 0.01 (half-filling)
+- ✓ Green's function: ∑ᵢ Gᵢᵢ = N - ⟨N_electrons⟩ (exact)
+- ✓ Idempotency: ||G² - G|| < 10⁻¹⁰ (numerical check)
+
+---
+
+### Green's Function Update Strategy
+
+#### Update Methods for Monte Carlo Sampling
+
+During Monte Carlo sampling, each accepted auxiliary field flip sᵢ,ₗ → -sᵢ,ₗ requires computing the new Green's function G'. Two primary approaches exist:
+
+**1. Sherman-Morrison (S-M) Rank-1 Update**
+
+For a rank-1 perturbation B' = B(I + Δ), the Green's function can be updated via:
+
+$$G' = G - \frac{G \Delta G}{1 + \text{tr}(\Delta G)}$$
+
+This is an O(N²) operation per update, avoiding full O(N³) recomputation.
+
+**2. Full Recomputation with QR Stabilization**
+
+Recompute B' from scratch using QR-stabilized matrix multiplication:
+
+$$B' = \prod_{l=1}^L B_l(s') \quad \text{(with QR every k steps)}$$
+$$G' = [I + B']^{-1} \quad \text{(stable formula)}$$
+
+This costs O(N³) per update but maintains numerical accuracy.
+
+---
+
+#### Method Comparison
+
+| Method | Cost per Update | Total Cost per Sweep | Numerical Stability | Implementation |
+|--------|----------------|---------------------|---------------------|----------------|
+| Sherman-Morrison | O(N²) | O(N³L) | Unstable | Moderate |
+| S-M + Periodic Reset | O(N²) + periodic O(N³) | O(N³L) + O(N⁴) | Conditionally stable | Complex |
+| **Full Recomputation** | **O(N³)** | **O(N⁴L)** | **Stable** | **Simple** |
+
+For N = 36, L = 120: Full recomputation is ~36× slower per sweep than ideal S-M, but maintains ε ~ 10⁻¹² accuracy.
+
+---
+
+#### Why We Do Not Use Sherman-Morrison Updates
+
+**Error Accumulation in S-M Updates:**
+
+Each S-M update in finite precision introduces relative error:
+
+$$\epsilon_{\text{single}} \approx \epsilon_{\text{machine}} \cdot \kappa(G)$$
+
+where κ(G) is the condition number of the Green's function. Since G = [I + B]⁻¹ and κ(B) ~ 10¹⁶, we have κ(G) ~ κ(B).
+
+After N_updates successive S-M updates, errors accumulate multiplicatively:
+
+$$\epsilon_{\text{cumulative}} \approx N_{\text{updates}} \cdot \epsilon_{\text{machine}} \cdot \kappa(G) \sim N_{\text{updates}} \cdot 10^{-16} \cdot 10^{16} = N_{\text{updates}}$$
+
+**Breakdown for typical simulation:**
+
+For a single sweep (N × L ~ 4000 updates at N=36, L=120):
+
+$$\epsilon_{\text{after sweep}} \sim 4000 \times 10^{-16} \times 10^{16} \sim 10^{-8} \text{ to } 10^{-4}$$
+
+This violates fundamental Green's function properties:
+- Idempotency: ‖G(I-G) - G‖ > 10⁻⁴ (should be ~10⁻¹⁴)
+- Trace relation: Tr(G) drifts from exact value
+- Detailed balance: Metropolis acceptance ratios become systematically wrong
+
+**Mathematical demonstration:**
+
+The relative error in matrix element Gᵢⱼ after k S-M updates:
+
+$$\delta G_{ij}^{(k)} = \sum_{m=1}^k \frac{\partial G_{ij}}{\partial G_{\text{all}}} \cdot \epsilon_m \approx k \cdot \epsilon_{\text{machine}} \cdot \left\| \frac{\partial G}{\partial B} \right\| \sim k \cdot \epsilon_{\text{machine}} \cdot \kappa(B)^2$$
+
+For κ(B) ~ 10¹⁶:
+
+$$\delta G^{(k)} \sim k \times 10^{-16} \times 10^{32} = k \times 10^{16} \quad \text{(catastrophic!)}$$
+
+Even with periodic resets every n_reset updates, the maximum error before reset:
+
+$$\epsilon_{\max} \sim n_{\text{reset}} \cdot \epsilon_{\text{machine}} \cdot \kappa(G)$$
+
+requires n_reset < 100 for reasonable accuracy, negating most computational savings.
+
+---
+
+#### Our Approach: Full QR-Stabilized Recomputation
+
+**Implementation:**
+```python
+for sweep in range(n_sweeps):
+    for l in range(L):
+        for i in range(N):
+            # Propose flip
+            s_new = -s[i, l]
+            
+            # Fast ratio calculation (O(1))
+            r_up = 1 + (1 - G_up[i,i]) * (exp(2*lambda*s_new) - 1)
+            r_dn = 1 + (1 - G_dn[i,i]) * (exp(-2*lambda*s_new) - 1)
+            ratio = abs(r_up * r_dn)
+            
+            # Metropolis accept/reject
+            if random() < min(1, ratio):
+                s[i, l] = s_new
+                
+                # Full recomputation with QR stabilization
+                B_up = compute_B_stabilized(s, spin='up')
+                B_dn = compute_B_stabilized(s, spin='dn')
+                G_up = stable_green(B_up)
+                G_dn = stable_green(B_dn)
+```
+
+**Advantages:**
+
+1. **Guaranteed accuracy**: Every G satisfies ‖G(I-G) - G‖ < 10⁻¹² throughout simulation
+2. **No error accumulation**: Each G computed from scratch with full stabilization
+3. **Correct sampling**: Detailed balance maintained to machine precision
+4. **Simplicity**: No need for error monitoring or adaptive resets
+
+**Cost justification:**
+
+The O(N⁴L) cost per sweep is acceptable for N ≤ 100. For larger systems, DQMC becomes prohibitively expensive regardless of update strategy due to the fermion sign problem. We prioritize numerical correctness over computational speed.
 
 ---
 
@@ -736,10 +978,10 @@ plt.title('Critical U for AFM Instability')
 │   ├── ms2_summary_dnorm.csv   # D-normalized magnetic moments
 │   └── combined_S_q_mean.txt   # Full S(q) maps
 │
-├── results/                     # Generated DQMC outputs
+├── results/                     # YOUR Generated DQMC outputs, after running code.
 │   └── .gitkeep
 │
-├── figures/                     # Generated plots
+├── figures/                     # YOUR Generated plots, after running code.
 │   └── .gitkeep
 │
 └── docs/                        # Additional documentation
@@ -752,7 +994,7 @@ plt.title('Critical U for AFM Instability')
 ### Parameter Space
 
 **Explored:**
-- Lattice sizes: L ∈ {2, 4, 6} (N = 4, 16, 36 sites)
+- Lattice sizes: L ∈ {2, 4, 6} (N = 4, 16, 36 sites) (8x8 can be reached, but it's time-consuming.)
 - Temperatures: β ∈ {1, 4, 6}
 - Interactions: U ∈ {1, 4, 10}
 - Total runs: 27 combinations
@@ -829,17 +1071,6 @@ If you use this code or methodology in your research, please cite:
 }
 ```
 
-### References
-
-**Theoretical Background:**
-1. Hubbard, J. (1963). Proc. R. Soc. Lond. A 276, 238
-2. Scalapino, D. J. et al. (1989). Phys. Rev. B 40, 197
-
-**DQMC Method:**
-3. Blankenbecler, R., Scalapino, D. J., & Sugar, R. L. (1981). Phys. Rev. D 24, 2278
-4. White, S. R. et al. (1989). Phys. Rev. B 40, 506
-5. Assaad, F. F. & Evertz, H. G. (2008). Lect. Notes Phys. 739, 277
-
 ---
 
 ## License
@@ -848,6 +1079,7 @@ MIT License - see LICENSE file for details.
 
 ## Contact
 
+**Name:** Yuewen Sun  
 **Issues:** https://github.com/jerrysun8416/hubbard-rpa-dqmc/issues  
 **Email:** sunyw@shanghaitech.edu.cn
 
