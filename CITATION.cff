@@ -1,0 +1,64 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Hubbard Model: RPA Analysis and DQMC Validation"
+version: 1.0.0
+date-released: 2025-01-18
+url: "https://github.com/jerrysun8416/hubbard-rpa-dqmc"
+repository-code: "https://github.com/jerrysun8416/hubbard-rpa-dqmc"
+license: MIT
+authors:
+  - family-names: "Yuewen"
+    given-names: "Sun"
+    email: sunyw@shanghaitech.edu.cn
+    affiliation: "ShanghaiTech University"
+keywords:
+  - condensed matter physics
+  - quantum monte carlo
+  - hubbard model
+  - random phase approximation
+  - magnetism
+  - strongly correlated electrons
+abstract: >
+  A comprehensive computational study of the two-dimensional Hubbard model
+  combining analytical Random Phase Approximation (RPA) with exact 
+  Determinantal Quantum Monte Carlo (DQMC) simulations. This package provides
+  MPI-parallelized DQMC implementation, complete RPA calculations, and a novel
+  D-normalization scheme for quantitative comparison. Includes validation
+  across parameter space and analysis of magnetic instabilities via Stoner
+  criterion.
+references:
+  - type: article
+    title: "Monte Carlo calculations of coupled boson-fermion systems"
+    authors:
+      - family-names: Blankenbecler
+        given-names: R.
+      - family-names: Scalapino
+        given-names: D. J.
+      - family-names: Sugar
+        given-names: R. L.
+    journal: "Physical Review D"
+    volume: 24
+    start: 2278
+    year: 1981
+    doi: 10.1103/PhysRevD.24.2278
+  - type: article
+    title: "Numerical study of the two-dimensional Hubbard model"
+    authors:
+      - family-names: White
+        given-names: S. R.
+      - family-names: Scalapino
+        given-names: D. J.
+      - family-names: Sugar
+        given-names: R. L.
+      - family-names: Loh
+        given-names: E. Y.
+      - family-names: Gubernatis
+        given-names: J. E.
+      - family-names: Scalettar
+        given-names: R. T.
+    journal: "Physical Review B"
+    volume: 40
+    start: 506
+    year: 1989
+    doi: 10.1103/PhysRevB.40.506
