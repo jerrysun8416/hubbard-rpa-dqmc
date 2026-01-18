@@ -1,5 +1,10 @@
 # Hubbard Model: RPA Analysis and DQMC Validation
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
+[![Jupyter](https://img.shields.io/badge/Jupyter-Notebook-orange.svg)](https://jupyter.org/)
+[![MPI](https://img.shields.io/badge/MPI-Parallel-green.svg)](https://www.open-mpi.org/)
+
 ## `v0.0.1` Notice: 
 - `src` is ready to run: DQMC on 2D Bipartite Hubbard model.
 - `notebooks` are not organized: RPA comparison and post analyzing.
